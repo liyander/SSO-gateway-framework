@@ -423,6 +423,12 @@ The platform admin panel uses `/platform-admin/*` to avoid colliding with Keyclo
 /platform-admin/audit
 ```
 
+Shortcut:
+
+```text
+/admin-panel -> /platform-admin/login
+```
+
 If `/keycloak-ready` returns `502 Bad Gateway`, check Keycloak directly inside Docker:
 
 ```bash
@@ -465,6 +471,21 @@ Or reset the framework volume during early testing:
 docker compose down -v
 docker compose up -d --build
 ```
+
+To update the existing Keycloak client automatically, run:
+
+```bash
+chmod +x ./scripts/configure-keycloak-client.sh
+./scripts/configure-keycloak-client.sh
+```
+
+This sets the `platform-gateway` client to allow:
+
+```text
+https://YOUR_HOST/oauth2/callback
+```
+
+Run it whenever `PLATFORM_HOST`, `OAUTH2_PROXY_CLIENT_ID`, or `OAUTH2_PROXY_CLIENT_SECRET` changes.
 
 If the browser says the Keycloak admin page is not redirecting properly, recreate Keycloak after the hostname fix:
 
