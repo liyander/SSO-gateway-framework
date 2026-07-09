@@ -281,6 +281,20 @@ function portalLayout(title, body) {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.get('/auth-unavailable', (_req, res) => {
+  res.status(503).send(portalLayout('Login Temporarily Unavailable', `
+    <section class="hero-panel">
+      <p class="eyebrow">Authentication service</p>
+      <h1>Login is warming up</h1>
+      <p class="hero-copy">The gateway is online, but the SSO service is not ready yet. Wait a moment and retry, or ask an admin to check the oauth2-proxy and Keycloak containers.</p>
+      <div class="landing-actions">
+        <a class="primary-action" href="/">Back home</a>
+        <a class="secondary-action" href="/admin/">Admin panel</a>
+      </div>
+    </section>
+  `));
+});
+
 app.get('/landing', (_req, res) => {
   res.send(portalLayout('Welcome', `
     <section class="hero-panel">
@@ -337,6 +351,20 @@ app.get('/login', (req, res) => {
   `));
 });
 
+app.get('/admin/login', (req, res) => {
+  if (req.session?.isAdmin) return res.redirect('/admin/');
+  res.send(layout('Login', `
+    <h1>Admin Login</h1>
+    <form method="post" action="/admin/login" style="max-width:420px">
+      ${req.query.error ? '<div class="error">Invalid username or password.</div>' : ''}
+      <label>Username <input name="username" autocomplete="username" required></label>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+      <button type="submit">Sign in</button>
+      <p class="muted">This is the temporary custom admin login. Keycloak SSO can replace it later.</p>
+    </form>
+  `));
+});
+
 app.post('/login', (req, res) => {
   if (req.body.username === adminUsername && req.body.password === adminPassword) {
     req.session.isAdmin = true;
@@ -346,7 +374,20 @@ app.post('/login', (req, res) => {
   res.redirect('/admin/login?error=1');
 });
 
+app.post('/admin/login', (req, res) => {
+  if (req.body.username === adminUsername && req.body.password === adminPassword) {
+    req.session.isAdmin = true;
+    req.session.actor = req.body.username;
+    return res.redirect('/admin/');
+  }
+  res.redirect('/admin/login?error=1');
+});
+
 app.get('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/admin/login'));
+});
+
+app.get('/admin/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
@@ -372,7 +413,55 @@ app.get('/', (req, res, next) => {
   `));
 });
 
+app.get('/admin/', requireAdmin, async (_req, res) => {
+  const [{ rows: appRows }, { rows: auditRows }] = await Promise.all([
+    pool.query('SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_enabled)::int AS enabled FROM applications'),
+    pool.query('SELECT COUNT(*)::int AS total FROM audit_logs'),
+  ]);
+  const stats = appRows[0];
+  res.send(layout('Dashboard', `
+    <h1>Dashboard</h1>
+    <section class="grid">
+      <div class="card"><div class="muted">Total Apps</div><div class="metric">${stats.total}</div></div>
+      <div class="card"><div class="muted">Enabled Apps</div><div class="metric">${stats.enabled}</div></div>
+      <div class="card"><div class="muted">Audit Events</div><div class="metric">${auditRows[0].total}</div></div>
+      <div class="card"><div class="muted">Allowed IPs</div><div>${[...allowedIps].map(escapeHtml).join('<br>')}</div></div>
+    </section>
+    <h2>Access Pattern</h2>
+    <div class="card"><code>https://${escapeHtml(process.env.PLATFORM_HOST || 'platform.com')}/app/&lt;slug&gt;</code> routes internally to <code>172.16.3.99:&lt;port&gt;</code>.</div>
+  `));
+});
+
 app.get('/apps', requireAdmin, async (_req, res) => {
+  const { rows } = await pool.query('SELECT * FROM applications ORDER BY id');
+  const tableRows = rows.map((row) => `
+    <tr>
+      <td><strong>${escapeHtml(row.name)}</strong><br><span class="muted">${escapeHtml(row.description || '')}</span></td>
+      <td><a href="${escapeHtml(row.public_path)}" target="_blank">${escapeHtml(row.public_path)}</a></td>
+      <td><code>${escapeHtml(row.internal_ip)}:${row.internal_port}</code></td>
+      <td><span class="pill">${escapeHtml(row.allowed_role)}</span></td>
+      <td>${row.is_enabled ? 'Enabled' : 'Disabled'}</td>
+      <td>
+        <a href="/admin/apps/${row.id}/edit">Edit</a>
+        <form method="post" action="/admin/apps/${row.id}/delete" style="display:inline; padding:0; border:0; background:transparent">
+          <button class="danger" type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+  `).join('');
+
+  res.send(layout('Applications', `
+    <h1>Applications</h1>
+    <table>
+      <thead><tr><th>Name</th><th>Public Path</th><th>Internal Target</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${tableRows || '<tr><td colspan="6">No applications configured.</td></tr>'}</tbody>
+    </table>
+    <h2>Add Application</h2>
+    ${appForm()}
+  `));
+});
+
+app.get('/admin/apps', requireAdmin, async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM applications ORDER BY id');
   const tableRows = rows.map((row) => `
     <tr>
@@ -432,7 +521,26 @@ app.post('/apps', requireAdmin, async (req, res) => {
   res.redirect('/admin/apps');
 });
 
+app.post('/admin/apps', requireAdmin, async (req, res) => {
+  const { errors, value } = validateApp(req.body);
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  const { rows } = await pool.query(
+    `INSERT INTO applications (name, slug, description, internal_ip, internal_port, public_path, allowed_role, is_enabled)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id`,
+    [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled],
+  );
+  await logAudit(req.session.actor, 'application.created', rows[0].id, value);
+  res.redirect('/admin/apps');
+});
+
 app.get('/apps/:id/edit', requireAdmin, async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM applications WHERE id = $1', [req.params.id]);
+  if (!rows[0]) return res.status(404).send(layout('Not Found', '<h1>Application not found</h1>'));
+  res.send(layout('Edit Application', `<h1>Edit Application</h1>${appForm(rows[0])}`));
+});
+
+app.get('/admin/apps/:id/edit', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM applications WHERE id = $1', [req.params.id]);
   if (!rows[0]) return res.status(404).send(layout('Not Found', '<h1>Application not found</h1>'));
   res.send(layout('Edit Application', `<h1>Edit Application</h1>${appForm(rows[0])}`));
@@ -452,13 +560,52 @@ app.post('/apps/:id', requireAdmin, async (req, res) => {
   res.redirect('/admin/apps');
 });
 
+app.post('/admin/apps/:id', requireAdmin, async (req, res) => {
+  const { errors, value } = validateApp(req.body);
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  await pool.query(
+    `UPDATE applications
+     SET name = $1, slug = $2, description = $3, internal_ip = $4, internal_port = $5,
+         public_path = $6, allowed_role = $7, is_enabled = $8, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $9`,
+    [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled, req.params.id],
+  );
+  await logAudit(req.session.actor, 'application.updated', req.params.id, value);
+  res.redirect('/admin/apps');
+});
+
 app.post('/apps/:id/delete', requireAdmin, async (req, res) => {
   await logAudit(req.session.actor, 'application.deleted', req.params.id, {});
   await pool.query('DELETE FROM applications WHERE id = $1', [req.params.id]);
   res.redirect('/admin/apps');
 });
 
+app.post('/admin/apps/:id/delete', requireAdmin, async (req, res) => {
+  await logAudit(req.session.actor, 'application.deleted', req.params.id, {});
+  await pool.query('DELETE FROM applications WHERE id = $1', [req.params.id]);
+  res.redirect('/admin/apps');
+});
+
 app.get('/audit', requireAdmin, async (_req, res) => {
+  const { rows } = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100');
+  const tableRows = rows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.created_at.toISOString())}</td>
+      <td>${escapeHtml(row.actor)}</td>
+      <td>${escapeHtml(row.action)}</td>
+      <td>${escapeHtml(JSON.stringify(row.details))}</td>
+    </tr>
+  `).join('');
+  res.send(layout('Audit Logs', `
+    <h1>Audit Logs</h1>
+    <table>
+      <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
+      <tbody>${tableRows || '<tr><td colspan="4">No audit logs yet.</td></tr>'}</tbody>
+    </table>
+  `));
+});
+
+app.get('/admin/audit', requireAdmin, async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100');
   const tableRows = rows.map((row) => `
     <tr>
