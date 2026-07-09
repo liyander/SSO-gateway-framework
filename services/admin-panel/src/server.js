@@ -47,6 +47,10 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
+function isAdminSurface(req) {
+  return req.header('x-platform-surface') === 'admin' || req.originalUrl.startsWith('/admin');
+}
+
 function parseRoles(req) {
   const groups = req.header('x-auth-request-groups') || '';
   const roles = req.header('x-auth-request-role') || '';
@@ -121,6 +125,7 @@ function layout(title, body) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} | Platform Admin</title>
+  <link rel="stylesheet" href="/assets/portal.css">
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Arial, sans-serif; background: #f8fbff; color: #172033; }
     * { box-sizing: border-box; }
@@ -172,9 +177,9 @@ function layout(title, body) {
     nav { display: flex; flex-wrap: wrap; gap: 8px; }
     nav a { color: #26364f; padding: 8px 10px; border-radius: 6px; }
     nav a:hover { background: rgba(255,255,255,0.72); }
-    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
-    h1 { font-size: 26px; margin: 0 0 18px; }
-    h2 { font-size: 18px; margin-top: 28px; }
+    main { max-width: 1180px; margin: 4vh auto 60px; padding: 28px; }
+    h1 { margin: 0 0 18px; color: #101a2b; font-size: clamp(32px, 5vw, 58px); line-height: 1; letter-spacing: 0; }
+    h2 { margin-top: 28px; color: #101a2b; font-size: 20px; }
     .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
     .card, table, form {
       background: rgba(255,255,255,0.78);
@@ -183,7 +188,7 @@ function layout(title, body) {
       box-shadow: 0 18px 60px rgba(48,70,102,0.14);
       backdrop-filter: blur(18px);
     }
-    .card { padding: 18px; }
+    .card { padding: 20px; }
     .metric { font-size: 30px; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; overflow: hidden; }
     th, td { text-align: left; padding: 12px; border-bottom: 1px solid rgba(38,54,79,0.14); vertical-align: top; }
@@ -333,7 +338,10 @@ app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 
-app.get('/', requireAdmin, async (_req, res) => {
+app.get('/', (req, res, next) => {
+  if (!isAdminSurface(req)) return res.redirect('/landing');
+  return requireAdmin(req, res, next);
+}, async (_req, res) => {
   const [{ rows: appRows }, { rows: auditRows }] = await Promise.all([
     pool.query('SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_enabled)::int AS enabled FROM applications'),
     pool.query('SELECT COUNT(*)::int AS total FROM audit_logs'),
