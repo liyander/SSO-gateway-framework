@@ -54,10 +54,22 @@ https://platform.com/admin/
 https://platform.com/app/academy
 ```
 
-This framework exposes only port `443`. If using Let's Encrypt, use TLS-ALPN validation:
+This framework exposes HTTPS. By default it binds host port `443`. If public `443` is rerouted to local `7846`, set this in `.env`:
+
+```text
+HTTPS_HOST_PORT=7846
+```
+
+If using Let's Encrypt, use TLS-ALPN validation with `acme.sh`:
 
 ```bash
-sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+sudo /root/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 443
+```
+
+If public `443` is rerouted to local `7846`, use:
+
+```bash
+sudo /root/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 7846
 ```
 
 ## App Server

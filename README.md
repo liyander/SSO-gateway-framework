@@ -27,7 +27,7 @@ Internal Application Server
   - /app/tom-ctf  -> 172.16.3.99:8080
 ```
 
-Only the gateway server should expose port `443` publicly in this setup. The application server ports should allow traffic only from the gateway server private IP.
+Only the gateway server should expose HTTPS publicly in this setup. By default the framework binds host port `443`, but you can set `HTTPS_HOST_PORT=7846` if public `443` is forwarded/rerouted to local port `7846`. The application server ports should allow traffic only from the gateway server private IP.
 
 ## Directory Layout
 
@@ -87,19 +87,38 @@ Production option with Let's Encrypt:
 
 Important: replace `platform.com` with a real domain or subdomain that you own and whose DNS `A` record points to the gateway server public IP. Certbot will fail if you use the placeholder `platform.com` or any domain that does not point to your server.
 
-This framework is configured for `443` only. Standard Certbot standalone HTTP validation uses port `80`, so use TLS-ALPN validation on port `443` instead:
+This framework is configured for `443` only. Standard Certbot standalone HTTP validation uses port `80`.
+
+Some Certbot builds do not support TLS-ALPN with the standalone plugin and will fail with:
+
+```text
+None of the preferred challenges are supported by the selected plugin
+```
+
+For a 443-only server, use `acme.sh` with TLS-ALPN instead:
 
 ```bash
 sudo apt update
-sudo apt install certbot -y
-sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+sudo apt install socat curl -y
+sudo su -
+curl https://get.acme.sh | sh -s email=you@example.com
+~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+~/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 443
+exit
 ```
 
-After Certbot succeeds, copy the generated files into this framework:
+If public `443` is forwarded to local port `7846`, issue the certificate on local port `7846` instead:
 
 ```bash
-sudo cp /etc/letsencrypt/live/your-domain.example/fullchain.pem ./certs/fullchain.pem
-sudo cp /etc/letsencrypt/live/your-domain.example/privkey.pem ./certs/privkey.pem
+~/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 7846
+```
+
+After issuance succeeds, install the generated certificate into this framework:
+
+```bash
+sudo /root/.acme.sh/acme.sh --install-cert -d your-domain.example \
+  --fullchain-file "$(pwd)/certs/fullchain.pem" \
+  --key-file "$(pwd)/certs/privkey.pem"
 sudo chown "$USER:$USER" ./certs/fullchain.pem ./certs/privkey.pem
 ```
 
@@ -107,14 +126,23 @@ If Nginx is already running on port `443`, stop it before using standalone TLS-A
 
 ```bash
 docker compose stop nginx
-sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+sudo /root/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 443
 docker compose up -d nginx
 ```
 
-If Certbot says port `443` is already in use, find the process:
+If your gateway receives public `443` on local port `7846`, use:
+
+```bash
+docker compose stop nginx
+sudo /root/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 7846
+docker compose up -d nginx
+```
+
+If the ACME client says port `443` or `7846` is already in use, find the process:
 
 ```bash
 sudo ss -ltnp | grep ':443'
+sudo ss -ltnp | grep ':7846'
 ```
 
 Common fixes:
@@ -128,8 +156,10 @@ docker compose stop nginx
 Then retry:
 
 ```bash
-sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+sudo /root/.acme.sh/acme.sh --issue -d your-domain.example --alpn --tlsport 443
 ```
+
+Use `--tlsport 7846` instead when public `443` is rerouted to local `7846`.
 
 If Certbot fails TLS-ALPN validation, check that your domain points to this gateway server and inbound `443` is open:
 
@@ -139,6 +169,47 @@ curl -vkI https://your-domain.example/
 ```
 
 The domain must point to the gateway server public IP, inbound port `443` must be allowed, and no Nginx/Apache/container should be serving HTTPS during the standalone challenge.
+
+If public `443` is rerouted to local `7846`, also allow local inbound `7846` and make sure the forwarding rule is:
+
+```text
+public 443 -> gateway-server 7846
+```
+
+If `acme.sh` reports `Connection refused`, Let's Encrypt reached the IP address but nothing accepted the challenge on port `443`. Check these items:
+
+```bash
+dig +short your-domain.example
+sudo ss -ltnp | grep ':443'
+sudo ss -ltnp | grep ':7846'
+sudo ufw status
+```
+
+Make sure:
+
+- The hostname resolves to this server's public IP.
+- The server firewall allows inbound TCP `443`.
+- If rerouted, the server firewall allows inbound TCP `7846`.
+- Any cloud/router firewall forwards inbound TCP `443` to this server.
+- Nginx is stopped while `acme.sh --alpn --tlsport 443` runs.
+- `acme.sh` is run with permission to bind the selected TLS port.
+
+If `acme.sh` was installed under your normal user, run it with `sudo` and the explicit home path:
+
+```bash
+docker compose stop nginx
+sudo ufw allow 443/tcp
+sudo ufw allow 7846/tcp
+sudo /home/user/.acme.sh/acme.sh --home /home/user/.acme.sh --issue -d your-domain.example --alpn --tlsport 443 --force --debug 2
+```
+
+For public `443` rerouted to local `7846`, use:
+
+```bash
+docker compose stop nginx
+sudo ufw allow 7846/tcp
+sudo /home/user/.acme.sh/acme.sh --home /home/user/.acme.sh --issue -d your-domain.example --alpn --tlsport 7846 --force --debug 2
+```
 
 No custom domain yet:
 
@@ -171,11 +242,14 @@ OAUTH2_PROXY_COOKIE_DOMAIN=199-46-34-76.sslip.io
 Then request a certificate with TLS-ALPN on port `443`:
 
 ```bash
-sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d 199-46-34-76.sslip.io
-sudo cp /etc/letsencrypt/live/199-46-34-76.sslip.io/fullchain.pem ./certs/fullchain.pem
-sudo cp /etc/letsencrypt/live/199-46-34-76.sslip.io/privkey.pem ./certs/privkey.pem
+sudo /root/.acme.sh/acme.sh --issue -d 199-46-34-76.sslip.io --alpn --tlsport 443
+sudo /root/.acme.sh/acme.sh --install-cert -d 199-46-34-76.sslip.io \
+  --fullchain-file "$(pwd)/certs/fullchain.pem" \
+  --key-file "$(pwd)/certs/privkey.pem"
 sudo chown "$USER:$USER" ./certs/fullchain.pem ./certs/privkey.pem
 ```
+
+If public `443` is rerouted to local `7846`, replace `--tlsport 443` with `--tlsport 7846`.
 
 If you later get a real domain but cannot stop anything on `443`, use DNS-01 validation instead. DNS-01 does not require opening port `80` or `443`, but it requires control of the domain DNS records.
 
@@ -243,6 +317,20 @@ Gateway server:
 sudo ufw allow 22
 sudo ufw allow 443
 sudo ufw enable
+```
+
+If public `443` is rerouted to local `7846`, use:
+
+```bash
+sudo ufw allow 22
+sudo ufw allow 7846/tcp
+sudo ufw enable
+```
+
+Set this in `.env`:
+
+```text
+HTTPS_HOST_PORT=7846
 ```
 
 Application server `172.16.3.99`:

@@ -105,7 +105,7 @@ services:
     container_name: platform-nginx
     restart: unless-stopped
     ports:
-      - "443:443"
+      - "${HTTPS_HOST_PORT:-443}:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
