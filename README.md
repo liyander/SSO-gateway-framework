@@ -65,10 +65,8 @@ cp .env.example .env
 Generate a strong oauth2-proxy cookie secret:
 
 ```bash
-python3 - <<'PY'
-import base64, os
-print(base64.b64encode(os.urandom(32)).decode())
-PY
+chmod +x ./scripts/generate-cookie-secret.sh ./scripts/check-cookie-secret.sh
+./scripts/generate-cookie-secret.sh
 ```
 
 Put the output in:
@@ -76,6 +74,14 @@ Put the output in:
 ```text
 OAUTH2_PROXY_COOKIE_SECRET=generated_value_here
 ```
+
+Check that it is valid:
+
+```bash
+./scripts/check-cookie-secret.sh "$OAUTH2_PROXY_COOKIE_SECRET"
+```
+
+oauth2-proxy must decode the value to exactly `16`, `24`, or `32` bytes. If logs say `cookie_secret ... is 26 bytes`, replace the value in `.env` with a newly generated one.
 
 3. Make the Keycloak client secret match:
 
