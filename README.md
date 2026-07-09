@@ -366,8 +366,10 @@ curl -vk https://127.0.0.1:7846/keycloak-ready
 The response should include:
 
 ```text
-"issuer":"https://YOUR_HOST/auth/realms/platform"
+"issuer":"https://YOUR_HOST/realms/platform"
 ```
+
+The framework routes public `/realms/*` and `/resources/*` to Keycloak's internal `/auth/*` paths because Keycloak 26 publishes frontend OIDC URLs without the `/auth` prefix when using the current hostname mode.
 
 If `/keycloak-ready` returns `502 Bad Gateway`, check Keycloak directly inside Docker:
 

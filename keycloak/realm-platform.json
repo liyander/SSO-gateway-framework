@@ -25,12 +25,14 @@
       "redirectUris": [
         "https://platform.com/oauth2/callback",
         "https://*.sslip.io/oauth2/callback",
-        "https://*/oauth2/callback"
+        "https://*/oauth2/callback",
+        "https://110.172.151.108.sslip.io/oauth2/callback"
       ],
       "webOrigins": [
         "https://platform.com",
         "https://*.sslip.io",
-        "https://*"
+        "https://*",
+        "https://110.172.151.108.sslip.io"
       ],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
