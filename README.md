@@ -27,7 +27,7 @@ Internal Application Server
   - /app/tom-ctf  -> 172.16.3.99:8080
 ```
 
-Only the gateway server should expose HTTPS publicly in this setup. By default the framework binds host port `443`, but you can set `HTTPS_HOST_PORT=7846` if public `443` is forwarded/rerouted to local port `7846`. The application server ports should allow traffic only from the gateway server private IP.
+Only the gateway server should expose HTTPS publicly in this setup. By default this framework binds host port `7846` because your public `443` is forwarded/rerouted to local port `7846`. Set `HTTPS_HOST_PORT=443` only if Docker should bind directly to host port `443`. The application server ports should allow traffic only from the gateway server private IP.
 
 ## Directory Layout
 
@@ -443,6 +443,18 @@ docker compose up -d --force-recreate --build cert-init admin-panel nginx
 docker compose ps
 docker compose logs --tail=100 cert-init
 docker compose logs --tail=100 nginx
+```
+
+For your current forwarded-port setup, `docker compose ps` should show Nginx similar to:
+
+```text
+0.0.0.0:7846->443/tcp
+```
+
+If it shows `0.0.0.0:443->443/tcp`, your `.env` is overriding the port. Set:
+
+```text
+HTTPS_HOST_PORT=7846
 ```
 
 Then test locally on the gateway server:
