@@ -357,6 +357,18 @@ Add or edit apps from the admin panel. Nginx does not need to be changed for eve
 
 This usually means the Keycloak client configuration does not match the public URL currently used by the browser.
 
+First verify Keycloak's public issuer metadata:
+
+```bash
+curl -vk https://127.0.0.1:7846/keycloak-ready
+```
+
+The response should include:
+
+```text
+"issuer":"https://YOUR_HOST/auth/realms/platform"
+```
+
 Check these values:
 
 ```text
@@ -388,6 +400,14 @@ Or reset the framework volume during early testing:
 docker compose down -v
 docker compose up -d --build
 ```
+
+If the browser says the Keycloak admin page is not redirecting properly, recreate Keycloak after the hostname fix:
+
+```bash
+docker compose up -d --force-recreate keycloak nginx oauth2-proxy
+```
+
+Then clear browser cookies for your host or test in a private window.
 
 ## Fix Internal Server Error
 

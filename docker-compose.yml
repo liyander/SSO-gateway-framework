@@ -28,9 +28,10 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-platform_password}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_password}
-      KC_HOSTNAME: https://${PLATFORM_HOST:-platform.com}/auth
-      KC_HOSTNAME_ADMIN: https://${PLATFORM_HOST:-platform.com}/auth
+      KC_HOSTNAME: https://${PLATFORM_HOST:-platform.com}
+      KC_HOSTNAME_ADMIN: https://${PLATFORM_HOST:-platform.com}
       KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
       KC_SPI_THEME_STATIC_MAX_AGE: -1
