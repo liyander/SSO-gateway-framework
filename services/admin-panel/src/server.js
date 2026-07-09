@@ -575,6 +575,11 @@ app.get('/apps', requireAdmin, async (_req, res) => {
 
   res.send(layout('Applications', `
     <h1>Applications</h1>
+    <div class="card" style="margin-bottom:16px">
+      <strong>SSO note:</strong>
+      Opening an app uses Keycloak SSO. Platform admin login is only for route management.
+      Use a Keycloak user with the app role, such as <code>student1</code> for <code>student</code> apps.
+    </div>
     <table>
       <thead><tr><th>Name</th><th>Public Path</th><th>Internal Target</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${tableRows || '<tr><td colspan="6">No applications configured.</td></tr>'}</tbody>
@@ -604,6 +609,11 @@ app.get('/platform-admin/apps', requireAdmin, async (_req, res) => {
 
   res.send(layout('Applications', `
     <h1>Applications</h1>
+    <div class="card" style="margin-bottom:16px">
+      <strong>SSO note:</strong>
+      Opening an app uses Keycloak SSO. Platform admin login is only for route management.
+      Use a Keycloak user with the app role, such as <code>student1</code> for <code>student</code> apps.
+    </div>
     <table>
       <thead><tr><th>Name</th><th>Public Path</th><th>Internal Target</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${tableRows || '<tr><td colspan="6">No applications configured.</td></tr>'}</tbody>

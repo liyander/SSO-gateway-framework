@@ -487,6 +487,27 @@ https://YOUR_HOST/oauth2/callback
 
 Run it whenever `PLATFORM_HOST`, `OAUTH2_PROXY_CLIENT_ID`, or `OAUTH2_PROXY_CLIENT_SECRET` changes.
 
+## Seed Keycloak Users
+
+The platform admin login is separate from Keycloak SSO. Clicking an app under `/app/<slug>` requires a Keycloak user with the matching role.
+
+Create/reset test users:
+
+```bash
+chmod +x ./scripts/seed-keycloak-users.sh
+./scripts/seed-keycloak-users.sh
+```
+
+Seeded credentials:
+
+```text
+admin1   / Admin123!    roles: admin, student, ctf_user, app1_user, app2_user, app3_user
+student1 / Student123!  roles: student
+ctfuser1 / CtfUser123!  roles: ctf_user
+```
+
+Use `student1` for apps whose allowed role is `student`, and `ctfuser1` for apps whose allowed role is `ctf_user`.
+
 If the browser says the Keycloak admin page is not redirecting properly, recreate Keycloak after the hostname fix:
 
 ```bash
