@@ -1,0 +1,76 @@
+{
+  "realm": "platform",
+  "enabled": true,
+  "displayName": "Incognitrix Platform",
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "Platform administrator" },
+      { "name": "student", "description": "Student access" },
+      { "name": "developer", "description": "Developer access" },
+      { "name": "ctf_user", "description": "CTF platform access" },
+      { "name": "app1_user", "description": "Application 1 access" },
+      { "name": "app2_user", "description": "Application 2 access" },
+      { "name": "app3_user", "description": "Application 3 access" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "platform-gateway",
+      "name": "Platform Gateway oauth2-proxy",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "change_this_keycloak_client_secret",
+      "redirectUris": [
+        "https://platform.com/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://platform.com"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "post.logout.redirect.uris": "https://platform.com/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin1",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin1@platform.local",
+      "credentials": [
+        { "type": "password", "value": "ChangeMeAdmin123!", "temporary": true }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "student1",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "student1@platform.local",
+      "credentials": [
+        { "type": "password", "value": "ChangeMeStudent123!", "temporary": true }
+      ],
+      "realmRoles": ["student"]
+    }
+  ]
+}

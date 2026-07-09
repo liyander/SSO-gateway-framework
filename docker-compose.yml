@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: platform
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform_password}
+    volumes:
+      - platform_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    container_name: platform-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--http-relative-path=/auth", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: platform
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-platform_password}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_password}
+      KC_HOSTNAME: ${PLATFORM_HOST:-platform.com}
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-platform.json:/opt/keycloak/data/import/realm-platform.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    container_name: platform-oauth2-proxy
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${PLATFORM_HOST:-platform.com}/auth/realms/${KEYCLOAK_REALM:-platform}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:-platform-gateway}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:-change_me}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:-change_this_32_byte_base64_secret}
+      OAUTH2_PROXY_COOKIE_DOMAIN: ${OAUTH2_PROXY_COOKIE_DOMAIN:-platform.com}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_REDIRECT_URL: https://${PLATFORM_HOST:-platform.com}/oauth2/callback
+      OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_SCOPE: "openid email profile roles"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_UPSTREAMS: static://202
+      OAUTH2_PROXY_WHITELIST_DOMAINS: .${PLATFORM_HOST:-platform.com}
+      OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY: ${OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY:-false}
+    depends_on:
+      - keycloak
+
+  admin-panel:
+    build: ./services/admin-panel
+    container_name: platform-admin-panel
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://platform:${POSTGRES_PASSWORD:-platform_password}@postgres:5432/platform
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change_me_admin_session_secret}
+      KEYCLOAK_URL: http://keycloak:8080/auth
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-platform}
+      ALLOWED_APP_IPS: ${ALLOWED_APP_IPS:-172.16.3.99}
+      MIN_APP_PORT: ${MIN_APP_PORT:-3000}
+      MAX_APP_PORT: ${MAX_APP_PORT:-9999}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway-proxy:
+    build: ./services/gateway-proxy
+    container_name: platform-gateway-proxy
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://platform:${POSTGRES_PASSWORD:-platform_password}@postgres:5432/platform
+      ALLOWED_APP_IPS: ${ALLOWED_APP_IPS:-172.16.3.99}
+      MIN_APP_PORT: ${MIN_APP_PORT:-3000}
+      MAX_APP_PORT: ${MAX_APP_PORT:-9999}
+      DEV_TRUST_PROXY_HEADERS: ${DEV_TRUST_PROXY_HEADERS:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: platform-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - keycloak
+      - oauth2-proxy
+      - admin-panel
+      - gateway-proxy
+
+volumes:
+  platform_postgres_data:

@@ -1,0 +1,5 @@
+.env
+certs/fullchain.pem
+certs/privkey.pem
+node_modules/
+npm-debug.log*
