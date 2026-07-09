@@ -58,6 +58,28 @@ function validateTarget(row) {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.get('/targets/:slug', async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').toLowerCase();
+    const { rows } = await pool.query(
+      'SELECT name, slug, internal_ip, internal_port, allowed_role, is_enabled FROM applications WHERE slug = $1 LIMIT 1',
+      [slug],
+    );
+    const appConfig = rows[0];
+    if (!appConfig) return res.status(404).json({ ok: false, error: 'Application not found' });
+    const targetAllowed = validateTarget(appConfig);
+    res.json({
+      ok: targetAllowed,
+      target: `http://${appConfig.internal_ip}:${appConfig.internal_port}`,
+      application: appConfig,
+      allowedTargets: [...allowedIps],
+      portRange: [minPort, maxPort],
+    });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 app.use('/app/:slug', async (req, res) => {
   try {
     const slug = String(req.params.slug || '').toLowerCase();

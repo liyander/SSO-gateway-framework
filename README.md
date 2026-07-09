@@ -111,7 +111,7 @@ certs/privkey.pem
 
 If these files are missing, the `cert-init` service will generate a temporary self-signed certificate so Nginx can still start. Browsers will warn on self-signed certificates. Replace the files with real certificates when available.
 
-For temporary self-signed certificates, set `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true` in `.env` while testing. Keep it `false` for production.
+For temporary self-signed certificates, set `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true` in `.env` while testing. Keep it `false` for production with trusted TLS certificates.
 
 ### Generate TLS Certificates
 
@@ -353,6 +353,42 @@ https://platform.com/app/tom-ctf  -> http://172.16.3.99:8080
 
 Add or edit apps from the admin panel. Nginx does not need to be changed for every new app because `/app/*` is routed to `gateway-proxy`, and the proxy looks up the target from PostgreSQL.
 
+### Routing Apps On The Same Server
+
+If an app is hosted on the same server as this gateway, do not use `127.0.0.1` or `localhost` in the admin panel. From inside Docker, those point to the gateway-proxy container itself.
+
+Use this target instead:
+
+```text
+Internal Target: host.docker.internal
+Internal Port: APP_PORT
+```
+
+The framework maps `host.docker.internal` to the Docker host with:
+
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+
+For apps on the separate app server, keep using:
+
+```text
+Internal Target: 172.16.3.99
+```
+
+Allowed targets are controlled by:
+
+```text
+ALLOWED_APP_IPS=172.16.3.99,host.docker.internal
+```
+
+Check a configured target through the gateway:
+
+```bash
+curl -vk https://127.0.0.1:7846/target-status/academy
+```
+
 ## Fix Keycloak `somethingWentWrong`
 
 This usually means the Keycloak client configuration does not match the public URL currently used by the browser.
@@ -455,6 +491,7 @@ Common causes:
 - Invalid `OAUTH2_PROXY_COOKIE_SECRET`. Use a base64-encoded 32-byte value.
 - Keycloak client secret mismatch.
 - Keycloak redirect URI still points to `platform.com` instead of your real host.
+- `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=false` while using a self-signed gateway certificate.
 - The internal app target, such as `172.16.3.99:3000`, is not reachable from the gateway server.
 - The user's Keycloak role does not match the app `allowed_role`.
 

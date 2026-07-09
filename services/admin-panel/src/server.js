@@ -102,7 +102,7 @@ function validateApp(input) {
 
   if (!input.name || input.name.trim().length < 2) errors.push('Application name is required.');
   if (!/^[a-z0-9][a-z0-9-]{0,98}$/.test(slug)) errors.push('Slug must contain lowercase letters, numbers, and hyphens.');
-  if (!allowedIps.has(internalIp)) errors.push(`Internal IP must be one of: ${[...allowedIps].join(', ')}`);
+  if (!allowedIps.has(internalIp)) errors.push(`Internal target must be one of: ${[...allowedIps].join(', ')}`);
   if (!Number.isInteger(portValue) || portValue < minPort || portValue > maxPort) errors.push(`Port must be between ${minPort} and ${maxPort}.`);
   if (!input.allowed_role || !/^[A-Za-z0-9_.:-]{2,100}$/.test(input.allowed_role)) errors.push('Allowed role is required.');
 
@@ -524,7 +524,7 @@ function appForm(appRow = {}) {
       </div>
       <label>Description <textarea name="description" rows="2">${escapeHtml(appRow.description || '')}</textarea></label>
       <div class="row">
-        <label>Internal IP <input name="internal_ip" value="${escapeHtml(appRow.internal_ip || '172.16.3.99')}" required></label>
+        <label>Internal Target <input name="internal_ip" value="${escapeHtml(appRow.internal_ip || '172.16.3.99')}" placeholder="172.16.3.99 or host.docker.internal" required></label>
         <label>Internal Port <input type="number" name="internal_port" min="${minPort}" max="${maxPort}" value="${escapeHtml(appRow.internal_port || 3000)}" required></label>
         <label>Allowed Role <input name="allowed_role" value="${escapeHtml(appRow.allowed_role || 'student')}" required></label>
       </div>
