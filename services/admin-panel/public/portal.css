@@ -198,6 +198,37 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.primary-action,
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary-action {
+  color: #ffffff;
+  background: #26364f;
+  box-shadow: 0 14px 36px rgba(38, 54, 79, 0.24);
+}
+
+.secondary-action {
+  border: 1px solid rgba(38, 54, 79, 0.18);
+  color: #26364f;
+  background: rgba(255, 255, 255, 0.72);
+}
+
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

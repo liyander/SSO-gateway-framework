@@ -122,30 +122,95 @@ function layout(title, body) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} | Platform Admin</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Arial, sans-serif; background: #0b1020; color: #eef2ff; }
-    body { margin: 0; background: #0b1020; }
-    a { color: #8bd3ff; text-decoration: none; }
-    header { display: flex; justify-content: space-between; align-items: center; padding: 18px 28px; border-bottom: 1px solid #26314f; background: #11182b; }
-    nav a { margin-right: 16px; color: #c7d2fe; }
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Arial, sans-serif; background: #f8fbff; color: #172033; }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.38), rgba(248,251,255,0.94)),
+        radial-gradient(circle at 12% 10%, rgba(255, 173, 207, 0.82) 0 8%, transparent 9%),
+        radial-gradient(circle at 25% 18%, rgba(255, 213, 228, 0.78) 0 11%, transparent 12%),
+        linear-gradient(125deg, #bdeeff 0%, #fbd0df 42%, #f8fff2 70%, #f8fbff 100%);
+      overflow-x: hidden;
+    }
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      content: "";
+      background:
+        linear-gradient(162deg, transparent 0 17%, rgba(66, 59, 82, 0.34) 18% 19%, transparent 20%),
+        linear-gradient(28deg, transparent 0 28%, rgba(66, 59, 82, 0.24) 29% 30%, transparent 31%),
+        linear-gradient(112deg, transparent 0 43%, rgba(175,177,188,0.18) 44% 62%, transparent 63%),
+        linear-gradient(180deg, transparent 0 70%, rgba(222,229,239,0.86) 100%);
+    }
+    a { color: #89435f; text-decoration: none; font-weight: 700; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px clamp(18px, 4vw, 48px);
+      border-bottom: 1px solid rgba(38,54,79,0.14);
+      background: rgba(255,255,255,0.68);
+      backdrop-filter: blur(18px);
+    }
+    header strong { display: inline-flex; align-items: center; gap: 10px; color: #101a2b; font-size: 18px; }
+    header strong::before {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      content: "I";
+      color: #ffffff;
+      background: #26364f;
+      box-shadow: 0 12px 28px rgba(38,54,79,0.22);
+    }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; }
+    nav a { color: #26364f; padding: 8px 10px; border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.72); }
     main { max-width: 1180px; margin: 0 auto; padding: 28px; }
     h1 { font-size: 26px; margin: 0 0 18px; }
     h2 { font-size: 18px; margin-top: 28px; }
     .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-    .card, table, form { background: #141d33; border: 1px solid #273455; border-radius: 8px; }
+    .card, table, form {
+      background: rgba(255,255,255,0.78);
+      border: 1px solid rgba(38,54,79,0.16);
+      border-radius: 8px;
+      box-shadow: 0 18px 60px rgba(48,70,102,0.14);
+      backdrop-filter: blur(18px);
+    }
     .card { padding: 18px; }
     .metric { font-size: 30px; font-weight: 700; }
     table { width: 100%; border-collapse: collapse; overflow: hidden; }
-    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #273455; vertical-align: top; }
-    th { color: #aab7d8; font-weight: 600; background: #18223b; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid rgba(38,54,79,0.14); vertical-align: top; }
+    th { color: #56657b; font-weight: 800; background: rgba(255,255,255,0.54); }
     form { padding: 18px; display: grid; gap: 12px; }
-    label { display: grid; gap: 6px; color: #c7d2fe; font-size: 14px; }
-    input, textarea, select { box-sizing: border-box; width: 100%; border: 1px solid #33415f; background: #0c1324; color: #eef2ff; border-radius: 6px; padding: 10px 12px; }
-    button { border: 0; border-radius: 6px; padding: 10px 14px; color: #07111f; background: #75e6a7; font-weight: 700; cursor: pointer; }
+    label { display: grid; gap: 6px; color: #3f4c63; font-size: 14px; font-weight: 700; }
+    input, textarea, select {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid rgba(38,54,79,0.24);
+      background: rgba(255,255,255,0.88);
+      color: #172033;
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+    button { border: 0; border-radius: 6px; padding: 10px 14px; color: #ffffff; background: #26364f; font-weight: 800; cursor: pointer; }
     .row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-    .danger { background: #ff8a8a; }
-    .muted { color: #9aa7c7; }
-    .error { padding: 12px; border: 1px solid #7f1d1d; color: #fecaca; background: #2b1118; border-radius: 8px; }
-    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #21304f; color: #dbeafe; }
+    .danger { background: #a83f5f; }
+    .muted { color: #56657b; }
+    .error { padding: 12px; border: 1px solid #ef9ab6; color: #7c1f3d; background: rgba(255,235,242,0.88); border-radius: 8px; }
+    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(137,67,95,0.12); color: #89435f; font-weight: 800; }
+    code { color: #26364f; overflow-wrap: anywhere; }
+    @media (max-width: 720px) {
+      header { align-items: flex-start; flex-direction: column; }
+      main { padding: 18px; }
+      table { display: block; overflow-x: auto; }
+    }
   </style>
 </head>
 <body>
@@ -198,6 +263,20 @@ function portalLayout(title, body) {
 }
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/landing', (_req, res) => {
+  res.send(portalLayout('Welcome', `
+    <section class="hero-panel">
+      <p class="eyebrow">Incognitrix SSO platform</p>
+      <h1>One gateway for every lab</h1>
+      <p class="hero-copy">Sign in once, then open the applications assigned to your role. Internal apps remain private behind the gateway.</p>
+      <div class="landing-actions">
+        <a class="primary-action" href="/portal">User login</a>
+        <a class="secondary-action" href="/admin/">Admin panel</a>
+      </div>
+    </section>
+  `));
+});
 
 app.get('/portal', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM applications WHERE is_enabled = true ORDER BY name');

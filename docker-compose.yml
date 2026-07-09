@@ -106,6 +106,31 @@ services:
       postgres:
         condition: service_healthy
 
+  cert-init:
+    image: alpine:3.20
+    container_name: platform-cert-init
+    restart: "no"
+    environment:
+      PLATFORM_HOST: ${PLATFORM_HOST:-platform.com}
+    volumes:
+      - ./certs:/certs
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        apk add --no-cache openssl >/dev/null
+        mkdir -p /certs
+        if [ ! -s /certs/fullchain.pem ] || [ ! -s /certs/privkey.pem ]; then
+          echo "Generating temporary self-signed certificate for ${PLATFORM_HOST}"
+          openssl req -x509 -nodes -newkey rsa:4096 -days 30 \
+            -keyout /certs/privkey.pem \
+            -out /certs/fullchain.pem \
+            -subj "/CN=${PLATFORM_HOST}"
+        else
+          echo "TLS certificate files already exist"
+        fi
+
   nginx:
     image: nginx:1.27-alpine
     container_name: platform-nginx
@@ -116,10 +141,16 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
-      - keycloak
-      - oauth2-proxy
-      - admin-panel
-      - gateway-proxy
+      cert-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+      oauth2-proxy:
+        condition: service_started
+      admin-panel:
+        condition: service_started
+      gateway-proxy:
+        condition: service_started
 
 volumes:
   platform_postgres_data:

@@ -103,6 +103,8 @@ certs/fullchain.pem
 certs/privkey.pem
 ```
 
+If these files are missing, the `cert-init` service will generate a temporary self-signed certificate so Nginx can still start. Browsers will warn on self-signed certificates. Replace the files with real certificates when available.
+
 For temporary self-signed certificates, set `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true` in `.env` while testing. Keep it `false` for production.
 
 ### Generate TLS Certificates
@@ -329,7 +331,7 @@ Normal users open:
 https://platform.com/
 ```
 
-They are redirected to the Keycloak login page and then land on a Sakura-style application portal. The portal shows only apps whose `allowed_role` matches the user's Keycloak roles. Users with the `admin` role can see all apps.
+They see a themed landing page. Clicking `User login` opens `/portal`, redirects to the Keycloak login page, and then lands on a Sakura-style application portal. The portal shows only apps whose `allowed_role` matches the user's Keycloak roles. Users with the `admin` role can see all apps.
 
 The first version keeps your existing app login and registration pages unchanged. The gateway is an outer SSO access layer.
 
@@ -400,6 +402,55 @@ Common causes:
 - Keycloak redirect URI still points to `platform.com` instead of your real host.
 - The internal app target, such as `172.16.3.99:3000`, is not reachable from the gateway server.
 - The user's Keycloak role does not match the app `allowed_role`.
+
+## If Nothing Is Accessible
+
+Run the built-in diagnostic script from this directory:
+
+```bash
+chmod +x ./scripts/diagnose.sh
+HTTPS_HOST_PORT=7846 ./scripts/diagnose.sh
+```
+
+If your framework binds directly to `443`, use:
+
+```bash
+HTTPS_HOST_PORT=443 ./scripts/diagnose.sh
+```
+
+Quick recovery checklist:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 nginx
+ls -l ./certs/fullchain.pem ./certs/privkey.pem
+sudo ss -ltnp | grep ':7846'
+curl -vk https://127.0.0.1:7846/health
+```
+
+Most total-outage causes:
+
+- `nginx` exited because the certificate files were missing or unreadable.
+- `HTTPS_HOST_PORT` is not set to the local forwarded port, such as `7846`.
+- Another process is already using the selected host port.
+- Firewall or router forwarding is not sending public `443` to the selected local port.
+- Containers were not recreated after config changes.
+
+Recreate the edge services and generate fallback certs if needed:
+
+```bash
+docker compose up -d --force-recreate --build cert-init admin-panel nginx
+docker compose ps
+docker compose logs --tail=100 cert-init
+docker compose logs --tail=100 nginx
+```
+
+Then test locally on the gateway server:
+
+```bash
+curl -vk https://127.0.0.1:${HTTPS_HOST_PORT:-7846}/health
+curl -vk https://127.0.0.1:${HTTPS_HOST_PORT:-7846}/
+```
 
 ## Firewall
 
