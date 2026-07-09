@@ -3,6 +3,7 @@ import session from 'express-session';
 import pg from 'pg';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const { Pool } = pg;
 
@@ -10,6 +11,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const portalCssPath = path.join(__dirname, '..', 'public', 'portal.css');
 
 const adminUsername = process.env.ADMIN_USERNAME || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -36,6 +38,14 @@ function escapeHtml(value = '') {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function portalStyles() {
+  try {
+    return readFileSync(portalCssPath, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 function slugify(value = '') {
@@ -126,6 +136,7 @@ function layout(title, body) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} | Platform Admin</title>
   <link rel="stylesheet" href="/assets/portal.css">
+  <style>${portalStyles()}</style>
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Arial, sans-serif; background: #f8fbff; color: #172033; }
     * { box-sizing: border-box; }
@@ -242,6 +253,7 @@ function portalLayout(title, body) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} | Incognitrix</title>
   <link rel="stylesheet" href="/assets/portal.css">
+  <style>${portalStyles()}</style>
 </head>
 <body class="portal-shell">
   <div class="scene" aria-hidden="true">
