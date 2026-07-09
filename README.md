@@ -258,7 +258,7 @@ Then set this in `.env`:
 
 ```text
 PLATFORM_HOST=YOUR_SERVER_IP
-OAUTH2_PROXY_COOKIE_DOMAIN=
+OAUTH2_PROXY_COOKIE_DOMAINS=
 OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true
 ```
 
@@ -268,7 +268,7 @@ Example with `sslip.io`, if your gateway public IP is `199.46.34.76`:
 
 ```text
 PLATFORM_HOST=199-46-34-76.sslip.io
-OAUTH2_PROXY_COOKIE_DOMAIN=199-46-34-76.sslip.io
+OAUTH2_PROXY_COOKIE_DOMAINS=
 ```
 
 Then request a certificate with TLS-ALPN on port `443`:
@@ -487,6 +487,25 @@ https://YOUR_HOST/oauth2/callback
 
 Run it whenever `PLATFORM_HOST`, `OAUTH2_PROXY_CLIENT_ID`, or `OAUTH2_PROXY_CLIENT_SECRET` changes.
 
+If login succeeds but `/oauth2/callback` shows `500 Internal Server Error`, run the client updater again and recreate oauth2-proxy:
+
+```bash
+./scripts/configure-keycloak-client.sh
+./scripts/seed-keycloak-users.sh
+docker compose up -d --force-recreate oauth2-proxy nginx
+```
+
+The updater also enables PKCE `S256`, matching oauth2-proxy's `OAUTH2_PROXY_CODE_CHALLENGE_METHOD=S256`.
+
+oauth2-proxy is configured to use Keycloak's `preferred_username` claim as the user id and email claim:
+
+```text
+OAUTH2_PROXY_USER_ID_CLAIM=preferred_username
+OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username
+```
+
+This avoids callback failures for test users that do not have a real email address. The seed script also sets local test emails for `admin1`, `student1`, and `ctfuser1`.
+
 ## Seed Keycloak Users
 
 The platform admin login is separate from Keycloak SSO. Clicking an app under `/app/<slug>` requires a Keycloak user with the matching role.
@@ -540,6 +559,9 @@ The live oauth2-proxy environment must show:
 ```text
 OAUTH2_PROXY_OIDC_ISSUER_URL=http://keycloak:8080/auth/realms/platform
 OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION=true
+OAUTH2_PROXY_CODE_CHALLENGE_METHOD=S256
+OAUTH2_PROXY_USER_ID_CLAIM=preferred_username
+OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username
 ```
 
 If logs still show oauth2-proxy discovering `https://YOUR_HOST/realms/platform`, the running container was not recreated from the updated compose file.

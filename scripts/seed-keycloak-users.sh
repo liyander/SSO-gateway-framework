@@ -16,6 +16,7 @@ create_or_update_user() {
   username="$1"
   password="$2"
   roles_csv="$3"
+  email="$4"
 
   docker compose exec -T \
     -e REALM="$REALM" \
@@ -24,6 +25,7 @@ create_or_update_user() {
     -e USERNAME="$username" \
     -e PASSWORD="$password" \
     -e ROLES_CSV="$roles_csv" \
+    -e USER_EMAIL="$email" \
     keycloak /bin/sh <<'EOS'
 set -eu
 KCADM=/opt/keycloak/bin/kcadm.sh
@@ -39,10 +41,16 @@ USER_ID="$($KCADM get users -r "$REALM" -q username="$USERNAME" --fields id | se
 if [ -z "$USER_ID" ]; then
   $KCADM create users -r "$REALM" \
     -s "username=$USERNAME" \
+    -s "email=$USER_EMAIL" \
     -s enabled=true \
     -s emailVerified=true >/dev/null
   USER_ID="$($KCADM get users -r "$REALM" -q username="$USERNAME" --fields id | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' | head -n 1)"
 fi
+
+$KCADM update "users/$USER_ID" -r "$REALM" \
+  -s "email=$USER_EMAIL" \
+  -s emailVerified=true \
+  -s enabled=true
 
 $KCADM set-password -r "$REALM" --userid "$USER_ID" --new-password "$PASSWORD" --temporary=false
 
@@ -60,9 +68,9 @@ echo "Ready: $USERNAME / $PASSWORD / $ROLES_CSV"
 EOS
 }
 
-create_or_update_user "admin1" "Admin123!" "admin,student,ctf_user,app1_user,app2_user,app3_user"
-create_or_update_user "student1" "Student123!" "student"
-create_or_update_user "ctfuser1" "CtfUser123!" "ctf_user"
+create_or_update_user "admin1" "Admin123!" "admin,student,ctf_user,app1_user,app2_user,app3_user" "admin1@incognitrix.local"
+create_or_update_user "student1" "Student123!" "student" "student1@incognitrix.local"
+create_or_update_user "ctfuser1" "CtfUser123!" "ctf_user" "ctfuser1@incognitrix.local"
 
 echo
 echo "Keycloak users seeded:"

@@ -57,6 +57,8 @@ $KCADM update "clients/$CLIENT_UUID" -r "$REALM" \
   -s 'standardFlowEnabled=true' \
   -s 'directAccessGrantsEnabled=false' \
   -s 'serviceAccountsEnabled=false' \
+  -s 'protocol=openid-connect' \
+  -s 'attributes."pkce.code.challenge.method"=S256' \
   -s "redirectUris=[\"$REDIRECT_URI\"]" \
   -s "webOrigins=[\"$PUBLIC_ORIGIN\"]" \
   -s "attributes.\"post.logout.redirect.uris\"=\"$LOGOUT_URI\""
