@@ -371,6 +371,22 @@ The response should include:
 
 The framework routes public `/realms/*` and `/resources/*` to Keycloak's internal `/auth/*` paths because Keycloak 26 publishes frontend OIDC URLs without the `/auth` prefix when using the current hostname mode.
 
+Keycloak may also publish its admin console under public `/admin/master/console/`. The Nginx config reserves these Keycloak paths:
+
+```text
+/admin/master/console/
+/admin/realms/
+/admin/serverinfo
+```
+
+The platform admin panel still uses:
+
+```text
+/admin/login
+/admin/apps
+/admin/audit
+```
+
 If `/keycloak-ready` returns `502 Bad Gateway`, check Keycloak directly inside Docker:
 
 ```bash
