@@ -317,7 +317,7 @@ docker compose up -d --build
 Open:
 
 ```text
-https://platform.com/admin/
+https://platform.com/platform-admin/
 ```
 
 The admin panel currently uses the temporary custom login from `.env`:
@@ -407,7 +407,7 @@ The response should include:
 
 The framework routes public `/realms/*` and `/resources/*` to Keycloak's internal `/auth/*` paths because Keycloak 26 publishes frontend OIDC URLs without the `/auth` prefix when using the current hostname mode.
 
-Keycloak may also publish its admin console under public `/admin/master/console/`. The Nginx config reserves these Keycloak paths:
+Keycloak owns the public `/admin/*` console paths:
 
 ```text
 /admin/master/console/
@@ -415,12 +415,12 @@ Keycloak may also publish its admin console under public `/admin/master/console/
 /admin/serverinfo
 ```
 
-The platform admin panel still uses:
+The platform admin panel uses `/platform-admin/*` to avoid colliding with Keycloak:
 
 ```text
-/admin/login
-/admin/apps
-/admin/audit
+/platform-admin/login
+/platform-admin/apps
+/platform-admin/audit
 ```
 
 If `/keycloak-ready` returns `502 Bad Gateway`, check Keycloak directly inside Docker:
@@ -450,7 +450,7 @@ keycloak/realm-platform.json -> clients[0].secret
 For an already-created realm, either update it in the Keycloak admin console:
 
 ```text
-https://YOUR_HOST/auth/admin/master/console/
+https://YOUR_HOST/admin/master/console/
 Realm: platform
 Client: platform-gateway
 Valid redirect URIs:
@@ -492,6 +492,7 @@ Common causes:
 - Keycloak client secret mismatch.
 - Keycloak redirect URI still points to `platform.com` instead of your real host.
 - `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=false` while using a self-signed gateway certificate.
+- oauth2-proxy trying to reach Keycloak through the public hostname instead of Docker networking. This framework uses internal issuer discovery with `OAUTH2_PROXY_OIDC_ISSUER_URL=http://keycloak:8080/auth/realms/platform` and `OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION=true`.
 - The internal app target, such as `172.16.3.99:3000`, is not reachable from the gateway server.
 - The user's Keycloak role does not match the app `allowed_role`.
 

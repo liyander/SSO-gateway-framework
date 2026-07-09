@@ -54,11 +54,11 @@ function slugify(value = '') {
 
 function requireAdmin(req, res, next) {
   if (req.session?.isAdmin) return next();
-  res.redirect('/admin/login');
+  res.redirect('/platform-admin/login');
 }
 
 function isAdminSurface(req) {
-  return req.header('x-platform-surface') === 'admin' || req.originalUrl.startsWith('/admin');
+  return req.header('x-platform-surface') === 'admin' || req.originalUrl.startsWith('/platform-admin');
 }
 
 function parseRoles(req) {
@@ -233,11 +233,11 @@ function layout(title, body) {
   <header>
     <strong>Platform Admin</strong>
     <nav>
-      <a href="/admin/">Dashboard</a>
-      <a href="/admin/apps">Applications</a>
-      <a href="/admin/audit">Audit Logs</a>
-      <a href="/auth/admin/master/console/" target="_blank">Keycloak</a>
-      <a href="/admin/logout">Logout</a>
+      <a href="/platform-admin/">Dashboard</a>
+      <a href="/platform-admin/apps">Applications</a>
+      <a href="/platform-admin/audit">Audit Logs</a>
+      <a href="/admin/master/console/" target="_blank">Keycloak</a>
+      <a href="/platform-admin/logout">Logout</a>
     </nav>
   </header>
   <main>${body}</main>
@@ -271,7 +271,7 @@ function portalLayout(title, body) {
     <nav>
       <a href="/">Apps</a>
       <a href="/oauth2/sign_out">Logout</a>
-      <a href="/admin/">Admin</a>
+      <a href="/platform-admin/">Admin</a>
     </nav>
   </header>
   <main class="portal-main">${body}</main>
@@ -291,7 +291,7 @@ app.get('/status', async (_req, res) => {
         <p class="hero-copy">Admin panel is reachable and PostgreSQL responded with <code>${dbResult.rows[0].ok}</code>.</p>
         <div class="landing-actions">
           <a class="primary-action" href="/">Home</a>
-          <a class="secondary-action" href="/admin/login">Admin login</a>
+          <a class="secondary-action" href="/platform-admin/login">Admin login</a>
         </div>
       </section>
     `));
@@ -314,7 +314,7 @@ app.get('/auth-unavailable', (_req, res) => {
       <p class="hero-copy">The gateway is online, but the SSO service is not ready yet. Wait a moment and retry, or ask an admin to check the oauth2-proxy and Keycloak containers.</p>
       <div class="landing-actions">
         <a class="primary-action" href="/">Back home</a>
-        <a class="secondary-action" href="/admin/">Admin panel</a>
+        <a class="secondary-action" href="/platform-admin/">Admin panel</a>
       </div>
     </section>
   `));
@@ -328,7 +328,7 @@ app.get('/landing', (_req, res) => {
       <p class="hero-copy">Sign in once, then open the applications assigned to your role. Internal apps remain private behind the gateway.</p>
       <div class="landing-actions">
         <a class="primary-action" href="/portal">User login</a>
-        <a class="secondary-action" href="/admin/">Admin panel</a>
+        <a class="secondary-action" href="/platform-admin/">Admin panel</a>
       </div>
     </section>
   `));
@@ -363,10 +363,10 @@ app.get('/portal', async (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  if (req.session?.isAdmin) return res.redirect('/admin/');
+  if (req.session?.isAdmin) return res.redirect('/platform-admin/');
   res.send(layout('Login', `
     <h1>Admin Login</h1>
-    <form method="post" action="/admin/login" style="max-width:420px">
+    <form method="post" action="/platform-admin/login" style="max-width:420px">
       ${req.query.error ? '<div class="error">Invalid username or password.</div>' : ''}
       <label>Username <input name="username" autocomplete="username" required></label>
       <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
@@ -376,11 +376,11 @@ app.get('/login', (req, res) => {
   `));
 });
 
-app.get('/admin/login', (req, res) => {
-  if (req.session?.isAdmin) return res.redirect('/admin/');
+app.get('/platform-admin/login', (req, res) => {
+  if (req.session?.isAdmin) return res.redirect('/platform-admin/');
   res.send(layout('Login', `
     <h1>Admin Login</h1>
-    <form method="post" action="/admin/login" style="max-width:420px">
+    <form method="post" action="/platform-admin/login" style="max-width:420px">
       ${req.query.error ? '<div class="error">Invalid username or password.</div>' : ''}
       <label>Username <input name="username" autocomplete="username" required></label>
       <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
@@ -389,31 +389,45 @@ app.get('/admin/login', (req, res) => {
     </form>
   `));
 });
+
+app.get('/admin/login', (_req, res) => res.redirect('/platform-admin/login'));
+app.get('/admin/', (_req, res) => res.redirect('/platform-admin/'));
+app.get('/admin/apps', (_req, res) => res.redirect('/platform-admin/apps'));
+app.get('/admin/audit', (_req, res) => res.redirect('/platform-admin/audit'));
 
 app.post('/login', (req, res) => {
   if (req.body.username === adminUsername && req.body.password === adminPassword) {
     req.session.isAdmin = true;
     req.session.actor = req.body.username;
-    return res.redirect('/admin/');
+    return res.redirect('/platform-admin/');
   }
-  res.redirect('/admin/login?error=1');
+  res.redirect('/platform-admin/login?error=1');
+});
+
+app.post('/platform-admin/login', (req, res) => {
+  if (req.body.username === adminUsername && req.body.password === adminPassword) {
+    req.session.isAdmin = true;
+    req.session.actor = req.body.username;
+    return res.redirect('/platform-admin/');
+  }
+  res.redirect('/platform-admin/login?error=1');
 });
 
 app.post('/admin/login', (req, res) => {
   if (req.body.username === adminUsername && req.body.password === adminPassword) {
     req.session.isAdmin = true;
     req.session.actor = req.body.username;
-    return res.redirect('/admin/');
+    return res.redirect('/platform-admin/');
   }
-  res.redirect('/admin/login?error=1');
+  res.redirect('/platform-admin/login?error=1');
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/admin/login'));
+  req.session.destroy(() => res.redirect('/platform-admin/login'));
 });
 
-app.get('/admin/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/admin/login'));
+app.get('/platform-admin/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/platform-admin/login'));
 });
 
 app.get('/', (req, res, next) => {
@@ -438,7 +452,7 @@ app.get('/', (req, res, next) => {
   `));
 });
 
-app.get('/admin/', requireAdmin, async (_req, res) => {
+app.get('/platform-admin/', requireAdmin, async (_req, res) => {
   const [{ rows: appRows }, { rows: auditRows }] = await Promise.all([
     pool.query('SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE is_enabled)::int AS enabled FROM applications'),
     pool.query('SELECT COUNT(*)::int AS total FROM audit_logs'),
@@ -467,8 +481,8 @@ app.get('/apps', requireAdmin, async (_req, res) => {
       <td><span class="pill">${escapeHtml(row.allowed_role)}</span></td>
       <td>${row.is_enabled ? 'Enabled' : 'Disabled'}</td>
       <td>
-        <a href="/admin/apps/${row.id}/edit">Edit</a>
-        <form method="post" action="/admin/apps/${row.id}/delete" style="display:inline; padding:0; border:0; background:transparent">
+        <a href="/platform-admin/apps/${row.id}/edit">Edit</a>
+        <form method="post" action="/platform-admin/apps/${row.id}/delete" style="display:inline; padding:0; border:0; background:transparent">
           <button class="danger" type="submit">Delete</button>
         </form>
       </td>
@@ -486,7 +500,7 @@ app.get('/apps', requireAdmin, async (_req, res) => {
   `));
 });
 
-app.get('/admin/apps', requireAdmin, async (_req, res) => {
+app.get('/platform-admin/apps', requireAdmin, async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM applications ORDER BY id');
   const tableRows = rows.map((row) => `
     <tr>
@@ -496,8 +510,8 @@ app.get('/admin/apps', requireAdmin, async (_req, res) => {
       <td><span class="pill">${escapeHtml(row.allowed_role)}</span></td>
       <td>${row.is_enabled ? 'Enabled' : 'Disabled'}</td>
       <td>
-        <a href="/admin/apps/${row.id}/edit">Edit</a>
-        <form method="post" action="/admin/apps/${row.id}/delete" style="display:inline; padding:0; border:0; background:transparent">
+        <a href="/platform-admin/apps/${row.id}/edit">Edit</a>
+        <form method="post" action="/platform-admin/apps/${row.id}/delete" style="display:inline; padding:0; border:0; background:transparent">
           <button class="danger" type="submit">Delete</button>
         </form>
       </td>
@@ -517,7 +531,7 @@ app.get('/admin/apps', requireAdmin, async (_req, res) => {
 
 function appForm(appRow = {}) {
   return `
-    <form method="post" action="${appRow.id ? `/admin/apps/${appRow.id}` : '/admin/apps'}">
+    <form method="post" action="${appRow.id ? `/platform-admin/apps/${appRow.id}` : '/platform-admin/apps'}">
       <div class="row">
         <label>Application Name <input name="name" value="${escapeHtml(appRow.name || '')}" required></label>
         <label>Slug <input name="slug" value="${escapeHtml(appRow.slug || '')}" placeholder="juice" required></label>
@@ -535,7 +549,7 @@ function appForm(appRow = {}) {
 
 app.post('/apps', requireAdmin, async (req, res) => {
   const { errors, value } = validateApp(req.body);
-  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/platform-admin/apps">Back</a></p>`));
   const { rows } = await pool.query(
     `INSERT INTO applications (name, slug, description, internal_ip, internal_port, public_path, allowed_role, is_enabled)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -543,12 +557,12 @@ app.post('/apps', requireAdmin, async (req, res) => {
     [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled],
   );
   await logAudit(req.session.actor, 'application.created', rows[0].id, value);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
-app.post('/admin/apps', requireAdmin, async (req, res) => {
+app.post('/platform-admin/apps', requireAdmin, async (req, res) => {
   const { errors, value } = validateApp(req.body);
-  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/platform-admin/apps">Back</a></p>`));
   const { rows } = await pool.query(
     `INSERT INTO applications (name, slug, description, internal_ip, internal_port, public_path, allowed_role, is_enabled)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -556,7 +570,7 @@ app.post('/admin/apps', requireAdmin, async (req, res) => {
     [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled],
   );
   await logAudit(req.session.actor, 'application.created', rows[0].id, value);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
 app.get('/apps/:id/edit', requireAdmin, async (req, res) => {
@@ -565,7 +579,7 @@ app.get('/apps/:id/edit', requireAdmin, async (req, res) => {
   res.send(layout('Edit Application', `<h1>Edit Application</h1>${appForm(rows[0])}`));
 });
 
-app.get('/admin/apps/:id/edit', requireAdmin, async (req, res) => {
+app.get('/platform-admin/apps/:id/edit', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM applications WHERE id = $1', [req.params.id]);
   if (!rows[0]) return res.status(404).send(layout('Not Found', '<h1>Application not found</h1>'));
   res.send(layout('Edit Application', `<h1>Edit Application</h1>${appForm(rows[0])}`));
@@ -573,7 +587,7 @@ app.get('/admin/apps/:id/edit', requireAdmin, async (req, res) => {
 
 app.post('/apps/:id', requireAdmin, async (req, res) => {
   const { errors, value } = validateApp(req.body);
-  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/platform-admin/apps">Back</a></p>`));
   await pool.query(
     `UPDATE applications
      SET name = $1, slug = $2, description = $3, internal_ip = $4, internal_port = $5,
@@ -582,12 +596,12 @@ app.post('/apps/:id', requireAdmin, async (req, res) => {
     [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled, req.params.id],
   );
   await logAudit(req.session.actor, 'application.updated', req.params.id, value);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
-app.post('/admin/apps/:id', requireAdmin, async (req, res) => {
+app.post('/platform-admin/apps/:id', requireAdmin, async (req, res) => {
   const { errors, value } = validateApp(req.body);
-  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/admin/apps">Back</a></p>`));
+  if (errors.length) return res.status(400).send(layout('Invalid Application', `<div class="error">${errors.map(escapeHtml).join('<br>')}</div><p><a href="/platform-admin/apps">Back</a></p>`));
   await pool.query(
     `UPDATE applications
      SET name = $1, slug = $2, description = $3, internal_ip = $4, internal_port = $5,
@@ -596,19 +610,19 @@ app.post('/admin/apps/:id', requireAdmin, async (req, res) => {
     [value.name, value.slug, value.description, value.internal_ip, value.internal_port, value.public_path, value.allowed_role, value.is_enabled, req.params.id],
   );
   await logAudit(req.session.actor, 'application.updated', req.params.id, value);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
 app.post('/apps/:id/delete', requireAdmin, async (req, res) => {
   await logAudit(req.session.actor, 'application.deleted', req.params.id, {});
   await pool.query('DELETE FROM applications WHERE id = $1', [req.params.id]);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
-app.post('/admin/apps/:id/delete', requireAdmin, async (req, res) => {
+app.post('/platform-admin/apps/:id/delete', requireAdmin, async (req, res) => {
   await logAudit(req.session.actor, 'application.deleted', req.params.id, {});
   await pool.query('DELETE FROM applications WHERE id = $1', [req.params.id]);
-  res.redirect('/admin/apps');
+  res.redirect('/platform-admin/apps');
 });
 
 app.get('/audit', requireAdmin, async (_req, res) => {
@@ -630,7 +644,7 @@ app.get('/audit', requireAdmin, async (_req, res) => {
   `));
 });
 
-app.get('/admin/audit', requireAdmin, async (_req, res) => {
+app.get('/platform-admin/audit', requireAdmin, async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100');
   const tableRows = rows.map((row) => `
     <tr>
