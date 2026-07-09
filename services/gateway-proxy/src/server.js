@@ -20,11 +20,29 @@ const devTrustHeaders = process.env.DEV_TRUST_PROXY_HEADERS === 'true';
 function parseRoles(req) {
   const groups = req.header('x-auth-request-groups') || '';
   const roleHeader = req.header('x-auth-request-role') || '';
+  const token = req.header('x-auth-request-access-token') || req.header('authorization')?.replace(/^Bearer\s+/i, '') || '';
+  const tokenRoles = parseTokenRoles(token);
   return new Set(
-    [...groups.split(','), ...roleHeader.split(',')]
+    [...groups.split(','), ...roleHeader.split(','), ...tokenRoles]
       .map((role) => role.trim().replace(/^\//, ''))
       .filter(Boolean),
   );
+}
+
+function parseTokenRoles(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return [];
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+    return [
+      ...(decoded.groups || []),
+      ...(decoded.realm_access?.roles || []),
+      ...Object.values(decoded.resource_access || {}).flatMap((client) => client.roles || []),
+    ];
+  } catch {
+    return [];
+  }
 }
 
 function canAccess(req, allowedRole) {

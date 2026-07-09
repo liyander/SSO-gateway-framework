@@ -1,12 +1,15 @@
 import express from 'express';
 import session from 'express-session';
 import pg from 'pg';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const { Pool } = pg;
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const adminUsername = process.env.ADMIN_USERNAME || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
@@ -16,6 +19,7 @@ const maxPort = Number(process.env.MAX_APP_PORT || 9999);
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use('/assets', express.static(path.join(__dirname, '..', 'public')));
 app.use(
   session({
     secret: process.env.ADMIN_SESSION_SECRET || 'change_me_admin_session_secret',
@@ -41,6 +45,39 @@ function slugify(value = '') {
 function requireAdmin(req, res, next) {
   if (req.session?.isAdmin) return next();
   res.redirect('/admin/login');
+}
+
+function parseRoles(req) {
+  const groups = req.header('x-auth-request-groups') || '';
+  const roles = req.header('x-auth-request-role') || '';
+  const token = req.header('x-auth-request-access-token') || req.header('authorization')?.replace(/^Bearer\s+/i, '') || '';
+  const tokenRoles = parseTokenRoles(token);
+  return new Set(
+    [...groups.split(','), ...roles.split(','), ...tokenRoles]
+      .map((role) => role.trim().replace(/^\//, ''))
+      .filter(Boolean),
+  );
+}
+
+function parseTokenRoles(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return [];
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+    return [
+      ...(decoded.groups || []),
+      ...(decoded.realm_access?.roles || []),
+      ...Object.values(decoded.resource_access || {}).flatMap((client) => client.roles || []),
+    ];
+  } catch {
+    return [];
+  }
+}
+
+function userCanSeeApp(req, appRow) {
+  const roles = parseRoles(req);
+  return roles.has('admin') || roles.has(appRow.allowed_role);
 }
 
 function validateApp(input) {
@@ -127,7 +164,68 @@ function layout(title, body) {
 </html>`;
 }
 
+function portalLayout(title, body) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(title)} | Incognitrix</title>
+  <link rel="stylesheet" href="/assets/portal.css">
+</head>
+<body class="portal-shell">
+  <div class="scene" aria-hidden="true">
+    <div class="sun"></div>
+    <div class="branch branch-a"></div>
+    <div class="branch branch-b"></div>
+    <div class="gate"></div>
+    <div class="street"></div>
+  </div>
+  <header class="portal-topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark">I</span>
+      <span>Incognitrix</span>
+    </a>
+    <nav>
+      <a href="/">Apps</a>
+      <a href="/oauth2/sign_out">Logout</a>
+      <a href="/admin/">Admin</a>
+    </nav>
+  </header>
+  <main class="portal-main">${body}</main>
+</body>
+</html>`;
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/portal', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM applications WHERE is_enabled = true ORDER BY name');
+  const visibleApps = rows.filter((row) => userCanSeeApp(req, row));
+  const username = req.header('x-auth-request-user') || req.header('x-auth-request-email') || 'operator';
+  const roleText = [...parseRoles(req)].join(', ') || 'authenticated';
+
+  const appCards = visibleApps.map((row) => `
+    <a class="app-card" href="${escapeHtml(row.public_path)}">
+      <span class="app-kicker">${escapeHtml(row.allowed_role)}</span>
+      <strong>${escapeHtml(row.name)}</strong>
+      <span>${escapeHtml(row.description || 'Launch internal application')}</span>
+      <em>${escapeHtml(row.internal_ip)}:${row.internal_port}</em>
+    </a>
+  `).join('');
+
+  res.send(portalLayout('Applications', `
+    <section class="hero-panel">
+      <p class="eyebrow">Single sign-on gateway</p>
+      <h1>Welcome, ${escapeHtml(username)}</h1>
+      <p class="hero-copy">Your allowed labs and platforms are available below. The apps stay private on the internal server while this gateway handles access.</p>
+      <div class="role-line">Active roles: ${escapeHtml(roleText)}</div>
+    </section>
+    <section class="apps-grid">
+      ${appCards || '<div class="empty-state">No applications are assigned to your current role yet.</div>'}
+    </section>
+  `));
+});
 
 app.get('/login', (req, res) => {
   if (req.session?.isAdmin) return res.redirect('/admin/');

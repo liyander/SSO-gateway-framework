@@ -62,6 +62,21 @@ cp .env.example .env
 
 2. Edit `.env` and replace all `change_this...` values.
 
+Generate a strong oauth2-proxy cookie secret:
+
+```bash
+python3 - <<'PY'
+import base64, os
+print(base64.b64encode(os.urandom(32)).decode())
+PY
+```
+
+Put the output in:
+
+```text
+OAUTH2_PROXY_COOKIE_SECRET=generated_value_here
+```
+
 3. Make the Keycloak client secret match:
 
 ```text
@@ -71,6 +86,15 @@ OAUTH2_PROXY_CLIENT_SECRET=your_secret
 keycloak/realm-platform.json:
 "secret": "your_secret"
 ```
+
+If Keycloak was already started once, the realm import file will not automatically overwrite the existing realm in the PostgreSQL volume. For early testing, the simplest reset is:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+This deletes only the gateway framework database volume. It does not touch your existing application databases.
 
 4. Put TLS files in `certs/`:
 
@@ -297,6 +321,18 @@ ADMIN_PASSWORD
 
 It manages only the platform routing database. It does not modify existing app databases.
 
+## User Portal
+
+Normal users open:
+
+```text
+https://platform.com/
+```
+
+They are redirected to the Keycloak login page and then land on a Sakura-style application portal. The portal shows only apps whose `allowed_role` matches the user's Keycloak roles. Users with the `admin` role can see all apps.
+
+The first version keeps your existing app login and registration pages unchanged. The gateway is an outer SSO access layer.
+
 ## Application Routing
 
 Default seeded apps:
@@ -308,6 +344,62 @@ https://platform.com/app/tom-ctf  -> http://172.16.3.99:8080
 ```
 
 Add or edit apps from the admin panel. Nginx does not need to be changed for every new app because `/app/*` is routed to `gateway-proxy`, and the proxy looks up the target from PostgreSQL.
+
+## Fix Keycloak `somethingWentWrong`
+
+This usually means the Keycloak client configuration does not match the public URL currently used by the browser.
+
+Check these values:
+
+```text
+PLATFORM_HOST=110.172.151.108.sslip.io
+OAUTH2_PROXY_CLIENT_SECRET=change_this_keycloak_client_secret
+```
+
+The same client secret must exist in:
+
+```text
+keycloak/realm-platform.json -> clients[0].secret
+```
+
+For an already-created realm, either update it in the Keycloak admin console:
+
+```text
+https://YOUR_HOST/auth/admin/master/console/
+Realm: platform
+Client: platform-gateway
+Valid redirect URIs:
+  https://YOUR_HOST/oauth2/callback
+Web origins:
+  https://YOUR_HOST
+```
+
+Or reset the framework volume during early testing:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+## Fix Internal Server Error
+
+Check container logs first:
+
+```bash
+docker compose logs --tail=100 oauth2-proxy
+docker compose logs --tail=100 keycloak
+docker compose logs --tail=100 admin-panel
+docker compose logs --tail=100 gateway-proxy
+docker compose logs --tail=100 nginx
+```
+
+Common causes:
+
+- Invalid `OAUTH2_PROXY_COOKIE_SECRET`. Use a base64-encoded 32-byte value.
+- Keycloak client secret mismatch.
+- Keycloak redirect URI still points to `platform.com` instead of your real host.
+- The internal app target, such as `172.16.3.99:3000`, is not reachable from the gateway server.
+- The user's Keycloak role does not match the app `allowed_role`.
 
 ## Firewall
 

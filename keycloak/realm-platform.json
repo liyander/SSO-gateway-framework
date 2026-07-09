@@ -2,6 +2,7 @@
   "realm": "platform",
   "enabled": true,
   "displayName": "Incognitrix Platform",
+  "loginTheme": "incognitrix",
   "roles": {
     "realm": [
       { "name": "admin", "description": "Platform administrator" },
@@ -22,16 +23,20 @@
       "publicClient": false,
       "secret": "change_this_keycloak_client_secret",
       "redirectUris": [
-        "https://platform.com/oauth2/callback"
+        "https://platform.com/oauth2/callback",
+        "https://*.sslip.io/oauth2/callback",
+        "https://*/oauth2/callback"
       ],
       "webOrigins": [
-        "https://platform.com"
+        "https://platform.com",
+        "https://*.sslip.io",
+        "https://*"
       ],
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "attributes": {
-        "post.logout.redirect.uris": "https://platform.com/*"
+        "post.logout.redirect.uris": "https://platform.com/*##https://*.sslip.io/*##https://*/*"
       },
       "protocolMappers": [
         {

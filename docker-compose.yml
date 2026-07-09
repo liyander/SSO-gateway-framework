@@ -28,12 +28,17 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-platform_password}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_password}
-      KC_HOSTNAME: ${PLATFORM_HOST:-platform.com}
+      KC_HOSTNAME: https://${PLATFORM_HOST:-platform.com}/auth
+      KC_HOSTNAME_ADMIN: https://${PLATFORM_HOST:-platform.com}/auth
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
+      KC_SPI_THEME_STATIC_MAX_AGE: -1
+      KC_SPI_THEME_CACHE_THEMES: "false"
+      KC_SPI_THEME_CACHE_TEMPLATES: "false"
     volumes:
       - ./keycloak/realm-platform.json:/opt/keycloak/data/import/realm-platform.json:ro
+      - ./keycloak/themes/incognitrix:/opt/keycloak/themes/incognitrix:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,8 +51,8 @@ services:
       OAUTH2_PROXY_PROVIDER: oidc
       OAUTH2_PROXY_OIDC_ISSUER_URL: https://${PLATFORM_HOST:-platform.com}/auth/realms/${KEYCLOAK_REALM:-platform}
       OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:-platform-gateway}
-      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:-change_me}
-      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:-change_this_32_byte_base64_secret}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:-change_this_keycloak_client_secret}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
       OAUTH2_PROXY_COOKIE_DOMAIN: ${OAUTH2_PROXY_COOKIE_DOMAIN:-platform.com}
       OAUTH2_PROXY_COOKIE_SECURE: "true"
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"
@@ -73,6 +78,7 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://platform:${POSTGRES_PASSWORD:-platform_password}@postgres:5432/platform
+      PLATFORM_HOST: ${PLATFORM_HOST:-platform.com}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-change_me_admin_session_secret}
