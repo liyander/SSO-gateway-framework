@@ -486,6 +486,22 @@ docker compose logs --tail=100 gateway-proxy
 docker compose logs --tail=100 nginx
 ```
 
+Verify the live oauth2-proxy config:
+
+```bash
+chmod +x ./scripts/check-live-config.sh
+./scripts/check-live-config.sh
+```
+
+The live oauth2-proxy environment must show:
+
+```text
+OAUTH2_PROXY_OIDC_ISSUER_URL=http://keycloak:8080/auth/realms/platform
+OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION=true
+```
+
+If logs still show oauth2-proxy discovering `https://YOUR_HOST/realms/platform`, the running container was not recreated from the updated compose file.
+
 Common causes:
 
 - Invalid `OAUTH2_PROXY_COOKIE_SECRET`. Use a base64-encoded 32-byte value.
