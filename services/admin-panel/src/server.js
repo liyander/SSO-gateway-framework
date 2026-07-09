@@ -281,6 +281,31 @@ function portalLayout(title, body) {
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
+app.get('/status', async (_req, res) => {
+  try {
+    const dbResult = await pool.query('SELECT 1 AS ok');
+    res.send(portalLayout('Status', `
+      <section class="hero-panel">
+        <p class="eyebrow">Gateway status</p>
+        <h1>Platform is online</h1>
+        <p class="hero-copy">Admin panel is reachable and PostgreSQL responded with <code>${dbResult.rows[0].ok}</code>.</p>
+        <div class="landing-actions">
+          <a class="primary-action" href="/">Home</a>
+          <a class="secondary-action" href="/admin/login">Admin login</a>
+        </div>
+      </section>
+    `));
+  } catch (error) {
+    res.status(500).send(portalLayout('Status', `
+      <section class="hero-panel">
+        <p class="eyebrow">Gateway status</p>
+        <h1>Database is unavailable</h1>
+        <p class="hero-copy">${escapeHtml(error.message)}</p>
+      </section>
+    `));
+  }
+});
+
 app.get('/auth-unavailable', (_req, res) => {
   res.status(503).send(portalLayout('Login Temporarily Unavailable', `
     <section class="hero-panel">
