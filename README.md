@@ -27,7 +27,7 @@ Internal Application Server
   - /app/tom-ctf  -> 172.16.3.99:8080
 ```
 
-Only the gateway server should expose ports `80` and `443` publicly. The application server ports should allow traffic only from the gateway server private IP.
+Only the gateway server should expose port `443` publicly in this setup. The application server ports should allow traffic only from the gateway server private IP.
 
 ## Directory Layout
 
@@ -81,6 +81,125 @@ certs/privkey.pem
 
 For temporary self-signed certificates, set `OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true` in `.env` while testing. Keep it `false` for production.
 
+### Generate TLS Certificates
+
+Production option with Let's Encrypt:
+
+Important: replace `platform.com` with a real domain or subdomain that you own and whose DNS `A` record points to the gateway server public IP. Certbot will fail if you use the placeholder `platform.com` or any domain that does not point to your server.
+
+This framework is configured for `443` only. Standard Certbot standalone HTTP validation uses port `80`, so use TLS-ALPN validation on port `443` instead:
+
+```bash
+sudo apt update
+sudo apt install certbot -y
+sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+```
+
+After Certbot succeeds, copy the generated files into this framework:
+
+```bash
+sudo cp /etc/letsencrypt/live/your-domain.example/fullchain.pem ./certs/fullchain.pem
+sudo cp /etc/letsencrypt/live/your-domain.example/privkey.pem ./certs/privkey.pem
+sudo chown "$USER:$USER" ./certs/fullchain.pem ./certs/privkey.pem
+```
+
+If Nginx is already running on port `443`, stop it before using standalone TLS-ALPN mode:
+
+```bash
+docker compose stop nginx
+sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+docker compose up -d nginx
+```
+
+If Certbot says port `443` is already in use, find the process:
+
+```bash
+sudo ss -ltnp | grep ':443'
+```
+
+Common fixes:
+
+```bash
+sudo systemctl stop nginx
+sudo systemctl stop apache2
+docker compose stop nginx
+```
+
+Then retry:
+
+```bash
+sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
+```
+
+If Certbot fails TLS-ALPN validation, check that your domain points to this gateway server and inbound `443` is open:
+
+```bash
+dig +short your-domain.example
+curl -vkI https://your-domain.example/
+```
+
+The domain must point to the gateway server public IP, inbound port `443` must be allowed, and no Nginx/Apache/container should be serving HTTPS during the standalone challenge.
+
+No custom domain yet:
+
+For private/local testing, use a self-signed certificate and access the server by IP. Browsers will show a warning because the certificate is not publicly trusted.
+
+```bash
+openssl req -x509 -nodes -newkey rsa:4096 -days 365 \
+  -keyout ./certs/privkey.pem \
+  -out ./certs/fullchain.pem \
+  -subj "/CN=localhost"
+```
+
+Then set this in `.env`:
+
+```text
+PLATFORM_HOST=YOUR_SERVER_IP
+OAUTH2_PROXY_COOKIE_DOMAIN=
+OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true
+```
+
+For a free temporary domain, use a dynamic DNS provider such as DuckDNS, or an IP-based wildcard DNS service such as `sslip.io`.
+
+Example with `sslip.io`, if your gateway public IP is `199.46.34.76`:
+
+```text
+PLATFORM_HOST=199-46-34-76.sslip.io
+OAUTH2_PROXY_COOKIE_DOMAIN=199-46-34-76.sslip.io
+```
+
+Then request a certificate with TLS-ALPN on port `443`:
+
+```bash
+sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d 199-46-34-76.sslip.io
+sudo cp /etc/letsencrypt/live/199-46-34-76.sslip.io/fullchain.pem ./certs/fullchain.pem
+sudo cp /etc/letsencrypt/live/199-46-34-76.sslip.io/privkey.pem ./certs/privkey.pem
+sudo chown "$USER:$USER" ./certs/fullchain.pem ./certs/privkey.pem
+```
+
+If you later get a real domain but cannot stop anything on `443`, use DNS-01 validation instead. DNS-01 does not require opening port `80` or `443`, but it requires control of the domain DNS records.
+
+Local testing option with a self-signed certificate:
+
+```bash
+openssl req -x509 -nodes -newkey rsa:4096 -days 365 \
+  -keyout ./certs/privkey.pem \
+  -out ./certs/fullchain.pem \
+  -subj "/CN=platform.com"
+```
+
+For self-signed testing, also set this in `.env`:
+
+```text
+OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=true
+```
+
+For production, keep it disabled:
+
+```text
+OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY=false
+```
+
 5. Start the framework:
 
 ```bash
@@ -122,7 +241,6 @@ Gateway server:
 
 ```bash
 sudo ufw allow 22
-sudo ufw allow 80
 sudo ufw allow 443
 sudo ufw enable
 ```

@@ -15,7 +15,7 @@ Copy this `sso-gateway-framework` directory to the gateway server.
 
 ## DNS
 
-Point `platform.com` to the public IP of the gateway server.
+Point your real domain, or an `sslip.io` hostname, to the public IP of the gateway server.
 
 ## TLS
 
@@ -52,6 +52,12 @@ https://platform.com/health
 https://platform.com/auth/
 https://platform.com/admin/
 https://platform.com/app/academy
+```
+
+This framework exposes only port `443`. If using Let's Encrypt, use TLS-ALPN validation:
+
+```bash
+sudo certbot certonly --standalone --preferred-challenges tls-alpn-01 -d your-domain.example
 ```
 
 ## App Server
