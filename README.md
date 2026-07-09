@@ -369,6 +369,17 @@ The response should include:
 "issuer":"https://YOUR_HOST/auth/realms/platform"
 ```
 
+If `/keycloak-ready` returns `502 Bad Gateway`, check Keycloak directly inside Docker:
+
+```bash
+docker compose ps keycloak
+docker compose logs --tail=120 keycloak
+docker compose exec keycloak /bin/sh -lc 'curl -sS http://127.0.0.1:8080/auth/realms/platform/.well-known/openid-configuration | head'
+docker compose exec nginx /bin/sh -lc 'getent hosts keycloak && wget -S -O- http://keycloak:8080/auth/realms/platform/.well-known/openid-configuration | head'
+```
+
+If the direct Keycloak command fails, Keycloak is not ready or crashed. If direct Keycloak works but the Nginx command fails, the issue is Docker DNS/networking between containers.
+
 Check these values:
 
 ```text
