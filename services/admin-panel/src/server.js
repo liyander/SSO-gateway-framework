@@ -4,6 +4,7 @@ import pg from 'pg';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import http from 'node:http';
 
 const { Pool } = pg;
 
@@ -18,6 +19,27 @@ const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 const allowedIps = new Set((process.env.ALLOWED_APP_IPS || '172.16.3.99').split(',').map((ip) => ip.trim()).filter(Boolean));
 const minPort = Number(process.env.MIN_APP_PORT || 3000);
 const maxPort = Number(process.env.MAX_APP_PORT || 9999);
+
+function getUrl(url, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const request = http.get(url, { timeout: timeoutMs }, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 1200) {
+          request.destroy();
+        }
+      });
+      response.on('end', () => resolve({ ok: response.statusCode >= 200 && response.statusCode < 400, status: response.statusCode, body }));
+    });
+    request.on('timeout', () => {
+      request.destroy();
+      resolve({ ok: false, status: 0, body: 'timeout' });
+    });
+    request.on('error', (error) => resolve({ ok: false, status: 0, body: error.message }));
+  });
+}
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -304,6 +326,68 @@ app.get('/status', async (_req, res) => {
       </section>
     `));
   }
+});
+
+app.get('/debug/sso', async (_req, res) => {
+  const checks = [];
+
+  try {
+    const dbResult = await pool.query('SELECT COUNT(*)::int AS app_count FROM applications');
+    checks.push({ name: 'PostgreSQL', ok: true, detail: `${dbResult.rows[0].app_count} apps configured` });
+  } catch (error) {
+    checks.push({ name: 'PostgreSQL', ok: false, detail: error.message });
+  }
+
+  const keycloak = await getUrl('http://keycloak:8080/auth/realms/platform/.well-known/openid-configuration');
+  let issuer = '';
+  try {
+    issuer = JSON.parse(keycloak.body).issuer || '';
+  } catch {
+    issuer = keycloak.body.slice(0, 180);
+  }
+  checks.push({ name: 'Keycloak metadata', ok: keycloak.ok, detail: `status=${keycloak.status} issuer=${issuer}` });
+
+  const oauthAuth = await getUrl('http://oauth2-proxy:4180/oauth2/auth');
+  checks.push({
+    name: 'oauth2-proxy auth endpoint',
+    ok: oauthAuth.status === 401 || oauthAuth.status === 202,
+    detail: `status=${oauthAuth.status} body=${oauthAuth.body.slice(0, 180)}`,
+  });
+
+  let appRows = [];
+  try {
+    const { rows } = await pool.query('SELECT name, slug, internal_ip, internal_port, is_enabled FROM applications ORDER BY id');
+    appRows = rows;
+  } catch {
+    appRows = [];
+  }
+
+  const appHtml = appRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.name)}</td>
+      <td>${escapeHtml(row.slug)}</td>
+      <td><code>${escapeHtml(row.internal_ip)}:${row.internal_port}</code></td>
+      <td>${row.is_enabled ? 'Enabled' : 'Disabled'}</td>
+    </tr>
+  `).join('');
+
+  const checksHtml = checks.map((check) => `
+    <div class="card">
+      <div class="muted">${escapeHtml(check.name)}</div>
+      <div class="metric" style="font-size:24px">${check.ok ? 'OK' : 'FAIL'}</div>
+      <p style="overflow-wrap:anywhere">${escapeHtml(check.detail)}</p>
+    </div>
+  `).join('');
+
+  res.status(checks.every((check) => check.ok) ? 200 : 500).send(layout('SSO Debug', `
+    <h1>SSO Debug</h1>
+    <section class="grid">${checksHtml}</section>
+    <h2>Configured Apps</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Slug</th><th>Target</th><th>Status</th></tr></thead>
+      <tbody>${appHtml || '<tr><td colspan="4">No apps configured.</td></tr>'}</tbody>
+    </table>
+  `));
 });
 
 app.get('/auth-unavailable', (_req, res) => {

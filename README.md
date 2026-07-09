@@ -523,6 +523,20 @@ OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION=true
 
 If logs still show oauth2-proxy discovering `https://YOUR_HOST/realms/platform`, the running container was not recreated from the updated compose file.
 
+Open the SSO debug page:
+
+```text
+https://YOUR_HOST/debug/sso
+```
+
+Or from the server:
+
+```bash
+curl -vk https://127.0.0.1:7846/debug/sso
+```
+
+This checks PostgreSQL, Keycloak metadata, oauth2-proxy, and configured app targets from inside the Docker network.
+
 Common causes:
 
 - Invalid `OAUTH2_PROXY_COOKIE_SECRET`. Use a base64-encoded 32-byte value.
