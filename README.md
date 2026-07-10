@@ -502,9 +502,20 @@ oauth2-proxy is configured to use Keycloak's `preferred_username` claim as the u
 ```text
 OAUTH2_PROXY_USER_ID_CLAIM=preferred_username
 OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username
+OAUTH2_PROXY_OIDC_GROUPS_CLAIM=groups
+OAUTH2_PROXY_SKIP_CLAIMS_FROM_PROFILE_URL=true
+OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL=true
 ```
 
-This avoids callback failures for test users that do not have a real email address. The seed script also sets local test emails for `admin1`, `student1`, and `ctfuser1`.
+This avoids callback failures for test users that do not have a real email address and prevents oauth2-proxy from making an extra profile/userinfo request after token redemption. The seed script also sets local test emails for `admin1`, `student1`, and `ctfuser1`.
+
+For this testing setup, detailed oauth2-proxy error pages are enabled:
+
+```text
+OAUTH2_PROXY_SHOW_DEBUG_ON_ERROR=true
+```
+
+Disable it before production if the gateway becomes internet-facing for real users.
 
 ## Seed Keycloak Users
 
@@ -562,6 +573,9 @@ OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION=true
 OAUTH2_PROXY_CODE_CHALLENGE_METHOD=S256
 OAUTH2_PROXY_USER_ID_CLAIM=preferred_username
 OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username
+OAUTH2_PROXY_OIDC_GROUPS_CLAIM=groups
+OAUTH2_PROXY_SKIP_CLAIMS_FROM_PROFILE_URL=true
+OAUTH2_PROXY_SHOW_DEBUG_ON_ERROR=true
 ```
 
 If logs still show oauth2-proxy discovering `https://YOUR_HOST/realms/platform`, the running container was not recreated from the updated compose file.
